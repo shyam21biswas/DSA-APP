@@ -37,13 +37,15 @@ class MainActivity : ComponentActivity() {
             DSAAdminTheme {
                 //AdminHomeScreen()
 
-                //MyApp()
-                val navController = rememberNavController()
-                NavHost(navController = navController, startDestination = "ved") {
-                    composable("ved") { ved(navController) }
-                    composable("myapp") { MyApp() }
-                    composable("admin") { AdminHomeScreen() }
-                }
+                MyApp()
+//                val navController = rememberNavController()
+//                NavHost(navController = navController, startDestination = "ved") {
+//                    composable("ved") { ved(navController) }
+//                    composable("myapp") { MyApp() }
+//                    composable("admin") { AdminHomeScreen() }
+//
+//                }
+               // BarChartScreen()
 
 
             }

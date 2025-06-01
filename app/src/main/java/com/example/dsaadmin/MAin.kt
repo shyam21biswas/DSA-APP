@@ -38,6 +38,21 @@ import kotlinx.coroutines.tasks.await
 
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.Query
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 
 data class Company(
@@ -56,6 +71,8 @@ data class Question(
     val difficulty: String
 )
 
+
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun HomeScreen(navController: NavController, user: FirebaseUser?) {
@@ -72,16 +89,13 @@ fun HomeScreen(navController: NavController, user: FirebaseUser?) {
 
     //the is extra one
     var hasShownDialog by remember { mutableStateOf(false) }
-    var wasPreviouslyComplete by remember { mutableStateOf(false) }
+    val completedCompanyIds = remember { mutableStateMapOf<String, Boolean>() }
+    val completedCompanies = remember { mutableStateListOf<String>() }
 
-// Get questions from ViewModel
-    //val questionss = viewModel.questions.collectAsState().value
-
-// Filter company questions
-    val companyQuestions = questions.filter { "company" in it.tags }
-
-// Check if all company questions are completed now
-   // val allCompanyCompleted = companyQuestions.isNotEmpty() && companyQuestions.all { it.isCompleted }
+    //for a particular question click
+    var confirmCompletionQuestion by remember { mutableStateOf<Question?>(null) }
+    val coroutineScope = rememberCoroutineScope()
+    var showStatsDialog by remember { mutableStateOf(false) }
 
 
     //check this....
@@ -117,7 +131,6 @@ fun HomeScreen(navController: NavController, user: FirebaseUser?) {
                 companies = emptyList()
                 return@LaunchedEffect
             }
-
 
 
             val companyList = mutableListOf<Company>()
@@ -196,32 +209,30 @@ fun HomeScreen(navController: NavController, user: FirebaseUser?) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f),
+                .weight(1f).clickable { showStatsDialog = true },
             elevation = 4.dp
         ) {
             Column(
-                modifier = Modifier.padding(16.dp),
+                modifier = Modifier
+                    .padding(16.dp)
+                    .fillMaxSize(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+
+//
                 Text(
                     text = "Overall Progress",
-                    style = MaterialTheme.typography.h5,
-                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                    style = MaterialTheme.typography.body1
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "$totalSolved / $totalQuestions Solved",
-                    style = MaterialTheme.typography.body1,
-                    fontSize = 18.sp
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                LinearProgressIndicator(
+
+
+                ArchProgressBarWithInfo(
                     progress = overallProgress,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(8.dp),
-                    color = Color(0xFF4CAF50)
+                    totalQuestions = totalQuestions,
+                    totalSolved = totalSolved
                 )
+
+
             }
         }
 
@@ -234,7 +245,8 @@ fun HomeScreen(navController: NavController, user: FirebaseUser?) {
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(companies) { company ->
-                val percentage = if (company.total > 0) company.solved.toFloat() / company.total else 0f
+                val percentage =
+                    if (company.total > 0) company.solved.toFloat() / company.total else 0f
                 val progressColor = when {
                     percentage <= 0.33f -> Color.Red
                     percentage <= 0.70f -> Color.Yellow
@@ -283,17 +295,28 @@ fun HomeScreen(navController: NavController, user: FirebaseUser?) {
                                 )
                             }
                         } else {
-                            LaunchedEffect(Unit) {
 
-                                    hasShownDialog = true
 
-                            }
                             Icon(
                                 painter = androidx.compose.ui.res.painterResource(id = R.drawable.check),
                                 contentDescription = "Completed",
                                 modifier = Modifier.size(40.dp),
                                 tint = Color.Black
                             )
+
+                            // Trigger dialog only once when completion is detected
+
+                            // some how when the app start it wont get any company id "!completedCompanies.contains(company.id)"
+                            //got false .... handle the extra store things of complte company data.  in future they may be bug
+                            LaunchedEffect(company.id, company.solved, company.total) {
+                                if (company.solved == company.total &&
+                                    company.id == selectedCompanyId &&
+                                    !completedCompanies.contains(company.id)
+                                ) {
+                                    hasShownDialog = true
+                                    completedCompanies.add(company.id)
+                                }
+                            }
                         }
                     }
                 }
@@ -301,7 +324,9 @@ fun HomeScreen(navController: NavController, user: FirebaseUser?) {
         }
 
         Spacer(modifier = Modifier.height(16.dp))
-        val coroutineScope = rememberCoroutineScope()
+        //val coroutineScope = rememberCoroutineScope()
+
+
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
@@ -327,7 +352,8 @@ fun HomeScreen(navController: NavController, user: FirebaseUser?) {
                             .padding(vertical = 4.dp)
                             .clickable {
 
-                                Toast.makeText(context, "Question clicked", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Question clicked", Toast.LENGTH_SHORT)
+                                    .show()
                                 selectedQuestion = question
                                 // Toggle status and update Firestore
 //                                val newStatus = !isDone
@@ -354,31 +380,84 @@ fun HomeScreen(navController: NavController, user: FirebaseUser?) {
                         ) {
                             Column {
                                 Text(text = question.title, style = MaterialTheme.typography.body1)
-                                Text(
-                                    text = "tags | ${question.tags.joinToString("  ").capitalize()} | Difficulty: ${question.difficulty}",
-                                    style = MaterialTheme.typography.caption
-                                )
+                                Row {
+                                    Text(
+                                        text = "${question.tags.joinToString("  ")} ",
+                                        style = MaterialTheme.typography.caption
+                                    )
+                                    Spacer(modifier = Modifier.width(2.dp))
+                                    if (question.difficulty == "Easy")
+                                        Text(
+                                            text = "EASY",
+                                            color = Color.Green,
+                                            style = MaterialTheme.typography.caption
+                                        )
+                                    if (question.difficulty == "Medium")
+                                        Text(
+                                            text = "MEDIUM",
+                                            color = Color.Yellow,
+                                            style = MaterialTheme.typography.caption
+                                        )
+                                    else
+                                        Text(
+                                            text = "HARD",
+                                            color = Color.Red,
+                                            style = MaterialTheme.typography.caption,
+                                            fontWeight = FontWeight.Bold
+                                        )
+
+                                }
+
                             }
+//                            Icon(
+//                                painter = androidx.compose.ui.res.painterResource(
+//                                    id = if (isDone) R.drawable.done else R.drawable.not__done
+//                                ),
+//                                contentDescription = null,
+//                                modifier = Modifier.size(24.dp).clickable {
+//                                    val newStatus = !isDone
+//                                    questionStatusMap = questionStatusMap.toMutableMap().apply {
+//                                        put(question.id, newStatus)
+//                                    }
+//                                    user?.let {
+//                                        firestore.collection("users")
+//                                            .document(user.uid)
+//                                            .update("questionsStatus.${question.id}", newStatus)
+//                                    }
+//                                    coroutineScope.launch {
+//                                        saveQuestionsStatus(context, questionStatusMap)
+//                                    }
+//                                }
+//                            )
                             Icon(
                                 painter = androidx.compose.ui.res.painterResource(
                                     id = if (isDone) R.drawable.done else R.drawable.not__done
                                 ),
                                 contentDescription = null,
-                                modifier = Modifier.size(24.dp).clickable {
-                                    val newStatus = !isDone
-                                    questionStatusMap = questionStatusMap.toMutableMap().apply {
-                                        put(question.id, newStatus)
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .clickable {
+                                        if (!isDone) {
+                                            // Ask confirmation before marking as done
+                                            confirmCompletionQuestion = question
+                                        } else {
+                                            // Directly unmark without confirmation
+                                            questionStatusMap =
+                                                questionStatusMap.toMutableMap().apply {
+                                                    put(question.id, false)
+                                                }
+                                            user?.let {
+                                                firestore.collection("users")
+                                                    .document(user.uid)
+                                                    .update("questionsStatus.${question.id}", false)
+                                            }
+                                            coroutineScope.launch {
+                                                saveQuestionsStatus(context, questionStatusMap)
+                                            }
+                                        }
                                     }
-                                    user?.let {
-                                        firestore.collection("users")
-                                            .document(user.uid)
-                                            .update("questionsStatus.${question.id}", newStatus)
-                                    }
-                                    coroutineScope.launch {
-                                        saveQuestionsStatus(context, questionStatusMap)
-                                    }
-                                }
                             )
+
                         }
                     }
                 }
@@ -386,7 +465,7 @@ fun HomeScreen(navController: NavController, user: FirebaseUser?) {
         }
     }
 
-    val colorlist =  listOf(
+    val colorlist = listOf(
         Color(0xFF4CAF50),
         Color(0xFFE91E63),
         Color(0xFFE0A952)
@@ -402,7 +481,9 @@ fun HomeScreen(navController: NavController, user: FirebaseUser?) {
             text = {
                 FlowRow(
 
-                    modifier = Modifier.fillMaxWidth().padding(2.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(2.dp)
                 ) {
                     selectedQuestion!!.tags.forEach { tag ->
                         Surface(
@@ -447,68 +528,354 @@ fun HomeScreen(navController: NavController, user: FirebaseUser?) {
         )
     }
 
-}
+    //question click
+    if (confirmCompletionQuestion != null) {
+
+        AlertDialog(
+            onDismissRequest = { confirmCompletionQuestion = null },
+            title = { Text("Mark as Completed?") },
+            text = { Text("Are you sure you’ve completed this question?") },
+            confirmButton = {
+                TextButton(onClick = {
+
+                    confirmCompletionQuestion?.let { question ->
+                        questionStatusMap = questionStatusMap.toMutableMap().apply {
+                            put(question.id, true)
+                        }
+                        user?.let {
+                            firestore.collection("users")
+                                .document(user.uid)
+                                .update("questionsStatus.${question.id}", true)
+                        }
+                        coroutineScope.launch {
+                            saveQuestionsStatus(context, questionStatusMap)
+                        }
+                    }
+                    incrementTodaySolved(user!!.uid)
+                    confirmCompletionQuestion = null
+                }) {
+                    Text("Yes")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmCompletionQuestion = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+
+    if (showStatsDialog) {
+        StatsDialog(userId = user!!.uid) {
+            showStatsDialog = false
+        }
+    }
+
+
+
+    }
+
+
+
+
+//google signing up and intial firestore............
+@Composable
+fun SignInScreen(navController: NavController) {
+        val context = LocalContext.current
+
+
+        val launcher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+            try {
+                val account = task.getResult(ApiException::class.java)
+                val credential = GoogleAuthProvider.getCredential(account.idToken, null)
+                FirebaseAuth.getInstance().signInWithCredential(credential)
+                    .addOnCompleteListener { authResult ->
+                        if (authResult.isSuccessful) {
+                            val user = FirebaseAuth.getInstance().currentUser
+                            user?.let {
+                                val firestore = FirebaseFirestore.getInstance()
+                                val userRef = firestore.collection("users").document(user.uid)
+
+                                userRef.get().addOnSuccessListener { document ->
+                                    if (!document.exists()) {
+                                        // Create user document with default data
+                                        val userData =
+                                            mapOf("questionsStatus" to mapOf<String, Boolean>())
+                                        userRef.set(userData)
+                                            .addOnSuccessListener {
+                                                Log.d("Firestore", "User document created")
+                                            }
+                                            .addOnFailureListener { e ->
+                                                Log.e(
+                                                    "Firestore",
+                                                    "Failed to create user document",
+                                                    e
+                                                )
+                                            }
+                                    }
+                                }
+                            }
+                            navController.navigate("home")
+                        } else {
+                            Toast.makeText(context, "Sign-in failed", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+            } catch (e: Exception) {
+                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        LaunchedEffect(Unit) {
+            val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                .requestIdToken("958727059701-ccqo9qce5aro0tc9hllhci7h7cgq8tfo.apps.googleusercontent.com") // Add this from google-services.json
+                .requestEmail()
+                .build()
+
+            val client = GoogleSignIn.getClient(context, gso)
+            val signInIntent = client.signInIntent
+            launcher.launch(signInIntent)
+        }
+
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+    }
+
 
 
 
 @Composable
-fun SignInScreen(navController: NavController) {
-    val context = LocalContext.current
-    var selectedQuestion by remember { mutableStateOf<Question?>(null) }
+fun ArchProgressBarWithInfo(
+    progress: Float,
+    totalQuestions: Int,
+    totalSolved: Int,
+    modifier: Modifier = Modifier
+    ) {
 
-    val launcher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
-        try {
-            val account = task.getResult(ApiException::class.java)
-            val credential = GoogleAuthProvider.getCredential(account.idToken, null)
-            FirebaseAuth.getInstance().signInWithCredential(credential)
-                .addOnCompleteListener { authResult ->
-                    if (authResult.isSuccessful) {
-                        val user = FirebaseAuth.getInstance().currentUser
-                        user?.let {
-                            val firestore = FirebaseFirestore.getInstance()
-                            val userRef = firestore.collection("users").document(user.uid)
+        val color1 = if (progress <= 0.33f) Color(0xFFD72525) else if (progress <= 0.66f) Color(
+            0xFFFFC107
+        ) else Color(0xFF4CAF50)
+        val color2 = if (progress <= 0.33f) Color(0xFFFFFFFF)
+        else if (progress <= 0.66f) Color(
+            0xFFFFFFFF
+        ) else if (progress == 1f) Color(0xFF4CAF50) else Color(0xFFFFFFFF)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = modifier
+        ) {
+            Canvas(
+                modifier = Modifier
+                    .width(200.dp)
+                    .height(100.dp)
+                    .padding(8.dp)
+            ) {
+                val strokeWidth = 12.dp.toPx()
+                val diameter = size.width
+                val topLeft = Offset(0f, 0f)
+                val sweepAngle = 180f * progress.coerceIn(0f, 1f)
 
-                            userRef.get().addOnSuccessListener { document ->
-                                if (!document.exists()) {
-                                    // Create user document with default data
-                                    val userData = mapOf("questionsStatus" to mapOf<String, Boolean>())
-                                    userRef.set(userData)
-                                        .addOnSuccessListener {
-                                            Log.d("Firestore", "User document created")
-                                        }
-                                        .addOnFailureListener { e ->
-                                            Log.e("Firestore", "Failed to create user document", e)
-                                        }
-                                }
-                            }
-                        }
-                        navController.navigate("home")
-                    } else {
-                        Toast.makeText(context, "Sign-in failed", Toast.LENGTH_SHORT).show()
-                    }
-                }
-        } catch (e: Exception) {
-            Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                // Background Arch
+                drawArc(
+                    color = Color.LightGray.copy(alpha = 0.2f),
+                    startAngle = 180f,
+                    sweepAngle = 180f,
+                    useCenter = false,
+                    topLeft = topLeft,
+                    size = Size(diameter, diameter),
+                    style = Stroke(strokeWidth, cap = StrokeCap.Round)
+                )
+
+                // Foreground Arch with gradient
+                drawArc(
+                    brush = Brush.linearGradient(
+                        colors = listOf(color1, color2)
+                    ),
+                    startAngle = 180f,
+                    sweepAngle = sweepAngle,
+                    useCenter = false,
+                    topLeft = topLeft,
+                    size = Size(diameter, diameter),
+                    style = Stroke(strokeWidth, cap = StrokeCap.Round)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Column {
+                Text(
+                    text = "$totalSolved / $totalQuestions",
+                    style = MaterialTheme.typography.h6.copy(color = Color(0xFF000000))
+                )
+                Text(
+                    text = "Champ keep it up 👋",
+                    style = MaterialTheme.typography.body1
+                )
+            }
         }
     }
 
-    LaunchedEffect(Unit) {
-        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestIdToken("958727059701-ccqo9qce5aro0tc9hllhci7h7cgq8tfo.apps.googleusercontent.com") // Add this from google-services.json
-            .requestEmail()
-            .build()
 
-        val client = GoogleSignIn.getClient(context, gso)
-        val signInIntent = client.signInIntent
-        launcher.launch(signInIntent)
+//stat of progress...................
+fun fetchLast7DaysStats(
+        userId: String,
+        onResult: (Map<String, Int>) -> Unit
+) {
+        val db = FirebaseFirestore.getInstance()
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val today = Calendar.getInstance()
+
+        // Collect the last 7 dates
+        val last7Dates = (0..6).map {
+            today.apply { add(Calendar.DAY_OF_YEAR, -it) }
+            dateFormat.format(today.time)
+        }.reversed()
+
+        db.collection("users").document(userId)
+            .collection("dailyStats")
+            .get()
+            .addOnSuccessListener { snapshot ->
+                val allData = snapshot.documents.mapNotNull {
+                    val date = it.id
+                    val count = it.getLong("questionsSolved")?.toInt()
+                    if (count != null && date in last7Dates) date to count else null
+                }.toMap()
+
+                // Fill missing dates with 0
+                val result = last7Dates.associateWith { allData[it] ?: 0 }
+                onResult(result)
+            }
+            .addOnFailureListener {
+                onResult(emptyMap())
+            }
     }
 
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator()
+//not in used.......................
+@Composable
+fun BarChart(stats: Map<String, Int>, modifier: Modifier = Modifier) {
+        val maxVal = stats.values.maxOrNull()?.takeIf { it > 0 } ?: 1
+        val barWidth = 24.dp
+        val spacing = 16.dp
+        val labelStyle = MaterialTheme.typography.caption
+
+        Column(modifier = modifier.padding(8.dp)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+            ) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val canvasWidth = size.width
+                    val canvasHeight = size.height
+                    val barSpacing =
+                        (canvasWidth - (barWidth.toPx() * stats.size)) / (stats.size + 1)
+
+                    stats.entries.forEachIndexed { index, (date, value) ->
+                        val left = barSpacing + index * (barWidth.toPx() + barSpacing)
+                        val barHeight = (value / maxVal.toFloat()) * canvasHeight
+
+                        drawRect(
+                            color = Color(0xFF00C9FF),
+                            topLeft = Offset(left, canvasHeight - barHeight),
+                            size = Size(barWidth.toPx(), barHeight)
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            // Date labels
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                stats.keys.forEach { date ->
+                    Text(
+                        text = date.takeLast(2), // just show day part (dd)
+                        style = labelStyle,
+                        modifier = Modifier.width(barWidth)
+                    )
+                }
+            }
+        }
+    }
+
+
+fun incrementTodaySolved(userId: String) {
+    val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+    val docRef = FirebaseFirestore.getInstance()
+        .collection("users").document(userId)
+        .collection("dailyStats").document(date)
+
+    docRef.update("questionsSolved", FieldValue.increment(1))
+        .addOnFailureListener {
+            // If doc doesn’t exist, set to 1
+            docRef.set(mapOf("questionsSolved" to 1))
+        }
+}
+
+
+    
+
+//not in used   but desgin isung scracht..............
+@Composable
+fun StatsScreen(userId: String, onDismiss: () -> Unit) {
+    var stats by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
+
+    LaunchedEffect(Unit) {
+        fetchLast7DaysStats(userId) {
+            stats = it
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("📊 Daily Solved Stats", style = MaterialTheme.typography.h6)
+            IconButton(onClick = onDismiss) {
+                Icon(Icons.Default.Close, contentDescription = "Close")
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+        if (stats.isNotEmpty()) {
+            BarChart(stats)
+        } else {
+            Text("No stats available yet.")
+        }
     }
 }
+
+@Composable
+fun StatsDialog(userId: String, onDismiss: () -> Unit) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colors.background,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp)
+        ) {
+            //StatsScreen(userId = userId, onDismiss = onDismiss)
+            BarChartScreen(userId = userId, onDismiss = onDismiss)
+        }
+    }
+}
+
+
 
 
