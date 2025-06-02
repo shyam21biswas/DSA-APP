@@ -16,6 +16,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.with
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -48,7 +49,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.ui.draw.clip
@@ -58,6 +61,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.Query
 import kotlinx.coroutines.delay
@@ -118,6 +122,9 @@ fun HomeScreen(navController: NavController, user: FirebaseUser?) {
     //curent date time
     val sdf = SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault())
     val currentTimestamp = sdf.format(Date())
+
+    //view model for recent question solved
+    val viewModel: RecentSolvedViewModel = viewModel()
 
 
     //check this....
@@ -465,7 +472,9 @@ fun HomeScreen(navController: NavController, user: FirebaseUser?) {
                                     .clickable {
                                         if (!isDone) {
                                             // Ask confirmation before marking as done
+
                                             confirmCompletionQuestion = question
+
                                         } else {
                                             // Directly unmark without confirmation
                                             questionStatusMap =
@@ -571,6 +580,9 @@ fun HomeScreen(navController: NavController, user: FirebaseUser?) {
                         questionStatusMap = questionStatusMap.toMutableMap().apply {
                             put(question.id, true)
                         }
+                        //RecentSolvedManager.addSolvedQuestion(question.title)
+                        viewModel.addSolvedQuestion(user!!.uid, question.title)
+
                         user?.let {
                             firestore.collection("users")
                                 .document(user.uid)
@@ -582,7 +594,10 @@ fun HomeScreen(navController: NavController, user: FirebaseUser?) {
                     }
                     incrementTodaySolved(user!!.uid)
 
+
+
                     confirmCompletionQuestion = null
+
                     lastquestionsolved = true
 
 
@@ -972,10 +987,17 @@ fun StatsDialog(userId: String, onDismiss: () -> Unit) {
             color = MaterialTheme.colors.background,
             modifier = Modifier
                 .fillMaxWidth()
+                .heightIn(min = 200.dp, max = 700.dp) // Limit max height
+
                 .padding(16.dp)
+
         ) {
-            //StatsScreen(userId = userId, onDismiss = onDismiss)
-            BarChartScreen(userId = userId, onDismiss = onDismiss)
+
+
+                //StatsScreen(userId = userId, onDismiss = onDismiss)
+                BarChartScreen(userId = userId, onDismiss = onDismiss)
+
+
         }
     }
 }

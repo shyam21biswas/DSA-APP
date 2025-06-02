@@ -98,6 +98,9 @@ dependencies {
 
     implementation ("com.github.PhilJay:MPAndroidChart:v3.1.0")
 
+    //font google
+    implementation("androidx.compose.ui:ui-text-google-fonts:1.6.0")
+
 
 
 
