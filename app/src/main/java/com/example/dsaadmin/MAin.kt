@@ -4,6 +4,17 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.with
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -49,6 +60,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.Query
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -96,6 +108,16 @@ fun HomeScreen(navController: NavController, user: FirebaseUser?) {
     var confirmCompletionQuestion by remember { mutableStateOf<Question?>(null) }
     val coroutineScope = rememberCoroutineScope()
     var showStatsDialog by remember { mutableStateOf(false) }
+    //both are used to take note
+    var selectedQuestionNote by remember { mutableStateOf<Question?>(null) }
+    var takenote by remember { mutableStateOf(false) }
+
+    //for open congo...
+    var lastquestionsolved by remember { mutableStateOf<Boolean>(false) }
+
+    //curent date time
+    val sdf = SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault())
+    val currentTimestamp = sdf.format(Date())
 
 
     //check this....
@@ -311,10 +333,12 @@ fun HomeScreen(navController: NavController, user: FirebaseUser?) {
                             LaunchedEffect(company.id, company.solved, company.total) {
                                 if (company.solved == company.total &&
                                     company.id == selectedCompanyId &&
-                                    !completedCompanies.contains(company.id)
+                                    //!completedCompanies.contains(company.id)
+                                    lastquestionsolved
                                 ) {
                                     hasShownDialog = true
-                                    completedCompanies.add(company.id)
+                                    lastquestionsolved = false
+                                    //completedCompanies.add(company.id)
                                 }
                             }
                         }
@@ -354,7 +378,9 @@ fun HomeScreen(navController: NavController, user: FirebaseUser?) {
 
                                 Toast.makeText(context, "Question clicked", Toast.LENGTH_SHORT)
                                     .show()
-                                selectedQuestion = question
+                                selectedQuestionNote = question
+                                takenote = true
+
                                 // Toggle status and update Firestore
 //                                val newStatus = !isDone
 //                                questionStatusMap = questionStatusMap.toMutableMap().apply {
@@ -513,6 +539,7 @@ fun HomeScreen(navController: NavController, user: FirebaseUser?) {
     //when all question are solved ......
     if (hasShownDialog) {
         AlertDialog(
+            shape = RoundedCornerShape(16.dp),
             onDismissRequest = { hasShownDialog = false },
             title = {
                 Text("🎉 Congratulations!", fontWeight = FontWeight.Bold)
@@ -529,9 +556,11 @@ fun HomeScreen(navController: NavController, user: FirebaseUser?) {
     }
 
     //question click
+    //2. add a function that will show you the  last 5 question solved............
     if (confirmCompletionQuestion != null) {
 
         AlertDialog(
+            shape = RoundedCornerShape(16.dp),
             onDismissRequest = { confirmCompletionQuestion = null },
             title = { Text("Mark as Completed?") },
             text = { Text("Are you sure you’ve completed this question?") },
@@ -552,7 +581,11 @@ fun HomeScreen(navController: NavController, user: FirebaseUser?) {
                         }
                     }
                     incrementTodaySolved(user!!.uid)
+
                     confirmCompletionQuestion = null
+                    lastquestionsolved = true
+
+
                 }) {
                     Text("Yes")
                 }
@@ -565,6 +598,12 @@ fun HomeScreen(navController: NavController, user: FirebaseUser?) {
         )
     }
 
+//    if (lastquestionsolved) {
+//        LaunchedEffect(Unit) {
+//            delay(4000) // 2 seconds delay
+//            lastquestionsolved = false
+//        }}
+
 
     if (showStatsDialog) {
         StatsDialog(userId = user!!.uid) {
@@ -574,6 +613,17 @@ fun HomeScreen(navController: NavController, user: FirebaseUser?) {
 
 
 
+
+    if (takenote && selectedQuestionNote != null) {
+        NoteDialog(
+            userId = user?.uid.orEmpty(),
+            questionId = selectedQuestionNote!!.id,
+            onDismiss = {
+                takenote = false
+                selectedQuestionNote = null
+            }
+        )
+    }
     }
 
 
@@ -648,6 +698,7 @@ fun SignInScreen(navController: NavController) {
 
 
 
+@OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun ArchProgressBarWithInfo(
     progress: Float,
@@ -655,7 +706,7 @@ fun ArchProgressBarWithInfo(
     totalSolved: Int,
     modifier: Modifier = Modifier
     ) {
-
+        var currvalur  by remember { mutableStateOf(false) }
         val color1 = if (progress <= 0.33f) Color(0xFFD72525) else if (progress <= 0.66f) Color(
             0xFFFFC107
         ) else Color(0xFF4CAF50)
@@ -667,41 +718,93 @@ fun ArchProgressBarWithInfo(
             verticalAlignment = Alignment.CenterVertically,
             modifier = modifier
         ) {
-            Canvas(
+            Box(
+                contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .width(200.dp)
-                    .height(100.dp)
-                    .padding(8.dp)
+                    .size(200.dp)
             ) {
-                val strokeWidth = 12.dp.toPx()
-                val diameter = size.width
-                val topLeft = Offset(0f, 0f)
-                val sweepAngle = 180f * progress.coerceIn(0f, 1f)
+                Canvas(
+                    modifier = Modifier
+                        .width(200.dp)
+                        .height(100.dp)
+                        .padding(8.dp)
+                ) {
+                    val strokeWidth = 12.dp.toPx()
+                    val diameter = size.width
+                    val topLeft = Offset(0f, 0f)
+                    val sweepAngle = 180f * progress.coerceIn(0f, 1f)
 
-                // Background Arch
-                drawArc(
-                    color = Color.LightGray.copy(alpha = 0.2f),
-                    startAngle = 180f,
-                    sweepAngle = 180f,
-                    useCenter = false,
-                    topLeft = topLeft,
-                    size = Size(diameter, diameter),
-                    style = Stroke(strokeWidth, cap = StrokeCap.Round)
-                )
+                    // Background Arch
+                    drawArc(
+                        color = Color.LightGray.copy(alpha = 0.2f),
+                        startAngle = 180f,
+                        sweepAngle = 180f,
+                        useCenter = false,
+                        topLeft = topLeft,
+                        size = Size(diameter, diameter),
+                        style = Stroke(strokeWidth, cap = StrokeCap.Round)
+                    )
 
-                // Foreground Arch with gradient
-                drawArc(
-                    brush = Brush.linearGradient(
-                        colors = listOf(color1, color2)
-                    ),
-                    startAngle = 180f,
-                    sweepAngle = sweepAngle,
-                    useCenter = false,
-                    topLeft = topLeft,
-                    size = Size(diameter, diameter),
-                    style = Stroke(strokeWidth, cap = StrokeCap.Round)
-                )
+                    // Foreground Arch with gradient
+                    drawArc(
+                        brush = Brush.linearGradient(
+                            colors = listOf(color1, color2)
+                        ),
+                        startAngle = 180f,
+                        sweepAngle = sweepAngle,
+                        useCenter = false,
+                        topLeft = topLeft,
+                        size = Size(diameter, diameter),
+                        style = Stroke(strokeWidth, cap = StrokeCap.Round)
+                    )
+                }
+                // Center text
+                Column(verticalArrangement = Arrangement.Bottom) {
+                    Text(
+                        text = "",
+                        style = MaterialTheme.typography.h6.copy(color = Color(0xFF000000))
+                    )
+                    AnimatedContent(
+                        targetState = currvalur,
+                        transitionSpec = {
+                            (fadeIn(tween(300)) + scaleIn(initialScale = 0.8f) with
+                                    fadeOut(tween(300)) + scaleOut(targetScale = 0.8f)).using(
+                                SizeTransform(clip = false)
+                            )
+                        },
+                        contentAlignment = Alignment.Center
+                    ) { state ->
+                        if (state)
+                            Text(
+                                text = "${(progress * 100).toInt()}%",
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.clickable { currvalur = false }
+                            )
+                        else
+                            Text(
+                                text = "$totalSolved / $totalQuestions",
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.clickable { currvalur = true }
+                            )
+                    }
+//                    if(currvalur)
+//                    Text(
+//                        text = "${(progress * 100).toInt()}%",
+//                        fontSize = 24.sp,
+//                        fontWeight = FontWeight.Bold, modifier = Modifier.clickable { currvalur = false }
+//                    )
+//                    else
+//                    Text(
+//                        text = "$totalSolved / $totalQuestions",
+//                        fontSize = 24.sp,
+//                        fontWeight = FontWeight.Bold, modifier = Modifier.clickable { currvalur = true }
+//                    )
+                }
             }
+
+
 
             Spacer(modifier = Modifier.width(16.dp))
 
@@ -717,6 +820,7 @@ fun ArchProgressBarWithInfo(
             }
         }
     }
+
 
 
 //stat of progress...................
@@ -867,7 +971,7 @@ fun StatsDialog(userId: String, onDismiss: () -> Unit) {
             shape = RoundedCornerShape(16.dp),
             color = MaterialTheme.colors.background,
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
                 .padding(16.dp)
         ) {
             //StatsScreen(userId = userId, onDismiss = onDismiss)

@@ -5,6 +5,7 @@ import android.view.ViewGroup
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -16,7 +17,8 @@ import com.github.mikephil.charting.data.*
 import com.github.mikephil.charting.formatter.IndexAxisValueFormatter
 import com.github.mikephil.charting.utils.ColorTemplate
 import androidx.compose.ui.viewinterop.AndroidView
-
+import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.graphics.Color
 
 
 @Composable
@@ -39,7 +41,7 @@ fun BarChartScreen(userId: String, onDismiss: () -> Unit) {
     }
     Column(
         modifier = Modifier
-            .fillMaxSize()
+            .fillMaxWidth()
             .padding(16.dp)
     ) {
         Text("📊 Daily Solved Questions", style = MaterialTheme.typography.h6)
@@ -50,40 +52,45 @@ fun BarChartScreen(userId: String, onDismiss: () -> Unit) {
 
 @Composable
 fun BarChartView(stats: Map<String, Int>) {
-    AndroidView(
-        factory = { context ->
-            BarChart(context).apply {
-                layoutParams = ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    600
-                )
-                description.isEnabled = false
-                legend.isEnabled = false
-            }
-        },
-        update = { chart ->
-            val entries = stats.entries.mapIndexed { index, entry ->
-                BarEntry(index.toFloat(), entry.value.toFloat())
-            }
 
-            val dataSet = BarDataSet(entries, "Questions Solved").apply {
-                colors = ColorTemplate.MATERIAL_COLORS.toList()
-                valueTextSize = 12f
+    Column {
+        AndroidView(
+            factory = { context ->
+                BarChart(context).apply {
+                    layoutParams = ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        600
+                    )
+                    description.isEnabled = false
+                    legend.isEnabled = false
+                }
+            },
+            update = { chart ->
+                val entries = stats.entries.mapIndexed { index, entry ->
+                    BarEntry(index.toFloat(), entry.value.toFloat())
+                }
+
+                val dataSet = BarDataSet(entries, "Questions Solved").apply {
+                    colors = ColorTemplate.MATERIAL_COLORS.toList()
+                    valueTextSize = 12f
+                }
+
+                chart.data = BarData(dataSet)
+
+                chart.xAxis.apply {
+                    valueFormatter = IndexAxisValueFormatter(stats.keys.toList())
+                    granularity = 1f
+                    isGranularityEnabled = true
+                    position = XAxis.XAxisPosition.BOTTOM
+                    textSize = 12f
+                }
+
+                chart.axisRight.isEnabled = false
+                chart.animateY(1000)
+                chart.invalidate()
             }
+        )
 
-            chart.data = BarData(dataSet)
+    }
 
-            chart.xAxis.apply {
-                valueFormatter = IndexAxisValueFormatter(stats.keys.toList())
-                granularity = 1f
-                isGranularityEnabled = true
-                position = XAxis.XAxisPosition.BOTTOM
-                textSize = 12f
-            }
-
-            chart.axisRight.isEnabled = false
-            chart.animateY(1000)
-            chart.invalidate()
-        }
-    )
 }
