@@ -22,6 +22,7 @@ import com.github.mikephil.charting.utils.ColorTemplate
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -58,7 +59,8 @@ fun BarChartScreen(userId: String, onDismiss: () -> Unit ) {
         Row {
             Text("📊 Daily Solved Questions", style = MaterialTheme.typography.h6)
            // Text("X", style = MaterialTheme.typography.h6, modifier = Modifier.weight(1f).clickable {  onDismiss  }, textAlign = TextAlign.End)
-            IconButton(onClick = onDismiss ) {
+            Spacer(modifier = Modifier.weight(1f))
+            IconButton(onClick = onDismiss  ) {
                 Icon(Icons.Default.Close, contentDescription = "Close")
             }
         }

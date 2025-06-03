@@ -58,6 +58,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -83,6 +84,7 @@ data class Question(
     val id: String,
     val title: String,
     //val status: String,
+    val leetcodeNumber: Int? = null,
     val tags: List<String> = emptyList(),
     val difficulty: String
 )
@@ -385,8 +387,9 @@ fun HomeScreen(navController: NavController, user: FirebaseUser?) {
 
                                 Toast.makeText(context, "Question clicked", Toast.LENGTH_SHORT)
                                     .show()
-                                selectedQuestionNote = question
-                                takenote = true
+                                    //selectedQuestionNote = question
+                                selectedQuestion = question
+                                //takenote = true
 
                                 // Toggle status and update Firestore
 //                                val newStatus = !isDone
@@ -500,7 +503,7 @@ fun HomeScreen(navController: NavController, user: FirebaseUser?) {
         }
     }
 
-    val colorlist = listOf(
+    /*val colorlist = listOf(
         Color(0xFF4CAF50),
         Color(0xFFE91E63),
         Color(0xFFE0A952)
@@ -537,12 +540,117 @@ fun HomeScreen(navController: NavController, user: FirebaseUser?) {
                     }
                 }
             },
+
             confirmButton = {
                 TextButton(onClick = { selectedQuestion = null }) {
                     Text("Close")
                 }
             }
         )
+    }*/
+    val colorList = listOf(
+        Color(0xFF4CAF50),
+        Color(0xFFE91E63),
+        Color(0xFFE0A952)
+    )
+
+    if (selectedQuestion != null) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0x66000000)) // semi-transparent dark backdrop
+                .clickable(enabled = false) {} // prevent clicks behind dialog
+        ) {
+             //Glow Effect Box
+//            Box(
+//                modifier = Modifier
+//                    .align(Alignment.Center)
+//                    .size(300.dp)
+//                    .graphicsLayer {
+//                        shadowElevation = 50f
+//                        shape = RoundedCornerShape(20.dp)
+//                        clip = false
+//                    }
+//                    .background(
+//                        Color(0xFF4CAF50).copy(alpha = 0.7f),
+//                        shape = RoundedCornerShape(20.dp)
+//                    )
+//            )
+            AlertDialog(
+                shape = RoundedCornerShape(16.dp),
+
+                onDismissRequest = { selectedQuestion = null },
+                title = {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = selectedQuestion!!.title,
+                            style = MaterialTheme.typography.h5.copy(fontWeight = FontWeight.Bold)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "LeetCode #${selectedQuestion!!.leetcodeNumber ?: "Not Available"}",
+                            style = MaterialTheme.typography.body1.copy(color = Color.Gray)
+                        )
+                    }
+                },
+                text = {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = "Tags:",
+                            style = MaterialTheme.typography.body2.copy(fontWeight = FontWeight.Medium)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            maxItemsInEachRow = 3,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+
+
+                        ) {
+                            selectedQuestion!!.tags.forEachIndexed { index, tag ->
+                                val color = colorList[index % colorList.size]
+                                Surface(
+                                    shape = RoundedCornerShape(16.dp),
+                                    elevation = 4.dp,
+                                    color = color
+                                ) {
+                                    Text(
+                                        text = tag,
+                                        modifier = Modifier
+                                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                                        style = MaterialTheme.typography.body2.copy(color = Color.White)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    Row(
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp, end = 8.dp)
+                    ) {
+                        TextButton(onClick = {
+
+                            selectedQuestionNote = selectedQuestion
+                            takenote = true
+                        }) {
+                            Text("Take/See Notes")
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        TextButton(onClick = { selectedQuestion = null }) {
+                            Text("Close")
+                        }
+                    }
+                }
+            )
+        }
     }
 
     //when all question are solved ......
@@ -840,37 +948,37 @@ fun ArchProgressBarWithInfo(
 
 //stat of progress...................
 fun fetchLast7DaysStats(
-        userId: String,
-        onResult: (Map<String, Int>) -> Unit
+    userId: String,
+    onResult: (Map<String, Int>) -> Unit
 ) {
-        val db = FirebaseFirestore.getInstance()
-        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        val today = Calendar.getInstance()
+    val db = FirebaseFirestore.getInstance()
+    val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
-        // Collect the last 7 dates
-        val last7Dates = (0..6).map {
-            today.apply { add(Calendar.DAY_OF_YEAR, -it) }
-            dateFormat.format(today.time)
-        }.reversed()
+    // Properly collect last 7 dates
+    val last7Dates = (0..6).map {
+        Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -it) }
+    }.map {
+        dateFormat.format(it.time)
+    }.reversed()
 
-        db.collection("users").document(userId)
-            .collection("dailyStats")
-            .get()
-            .addOnSuccessListener { snapshot ->
-                val allData = snapshot.documents.mapNotNull {
-                    val date = it.id
-                    val count = it.getLong("questionsSolved")?.toInt()
-                    if (count != null && date in last7Dates) date to count else null
-                }.toMap()
+    db.collection("users").document(userId)
+        .collection("dailyStats")
+        .get()
+        .addOnSuccessListener { snapshot ->
+            val allData = snapshot.documents.mapNotNull {
+                val date = it.id
+                val count = it.getLong("questionsSolved")?.toInt()
+                if (count != null && date in last7Dates) date to count else null
+            }.toMap()
 
-                // Fill missing dates with 0
-                val result = last7Dates.associateWith { allData[it] ?: 0 }
-                onResult(result)
-            }
-            .addOnFailureListener {
-                onResult(emptyMap())
-            }
-    }
+            val result = last7Dates.associateWith { allData[it] ?: 0 }
+            onResult(result)
+        }
+        .addOnFailureListener {
+            onResult(emptyMap())
+        }
+}
+
 
 //not in used.......................
 @Composable

@@ -13,8 +13,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.remember
+
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import java.text.SimpleDateFormat
@@ -60,7 +59,7 @@ class RecentSolvedViewModel : ViewModel() {
     }
 
     fun addSolvedQuestion(userId: String, title: String) {
-        val timestamp = SimpleDateFormat("hh:mm a, dd MMM yyyy", Locale.getDefault()).format(Date())
+        val timestamp = SimpleDateFormat("hh:mm a, dd MMM yyyy",  Locale.getDefault()).format(Date())
         val question = SolvedQuestion(title, timestamp)
 
         val ref = FirebaseFirestore.getInstance()
