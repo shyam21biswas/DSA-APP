@@ -124,7 +124,7 @@ fun BarChartView(stats: Map<String, Int> , userId: String) {
         }
 
         Column(modifier = Modifier.padding(16.dp).fillMaxWidth().heightIn(min = 200.dp, max = 270.dp)){ // Limit max height) {
-            Text("🕑Recent Solved Questions", style = MaterialTheme.typography.h5)
+            Text("Recent Solved Questions", style = MaterialTheme.typography.h6)
             Spacer(modifier = Modifier.height(8.dp))
 
             if (recentQuestions.isEmpty()) {

@@ -1,5 +1,7 @@
 package com.example.dsaadmin
 
+import android.content.Intent
+import android.net.Uri
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -15,6 +17,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.with
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
@@ -54,6 +57,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.CardDefaults
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -379,92 +383,155 @@ fun HomeScreen(navController: NavController, user: FirebaseUser?) {
                 items(questions) { question ->
                     val isDone = questionStatusMap[question.id] == true
 
+//                    Card(
+//                        modifier = Modifier
+//                            .fillMaxWidth()
+//                            .padding(vertical = 4.dp)
+//                            .clickable {
+//
+//                                Toast.makeText(context, "Question clicked", Toast.LENGTH_SHORT)
+//                                    .show()
+//
+//                                selectedQuestion = question
+//
+//                            },
+//                        elevation = 2.dp
+//                    ) {
+//                        Row(
+//                            modifier = Modifier
+//                                .fillMaxWidth()
+//                                .padding(16.dp),
+//                            horizontalArrangement = Arrangement.SpaceBetween,
+//                            verticalAlignment = Alignment.CenterVertically
+//                        ) {
+//                            Column {
+//                                Text(text = question.title, style = MaterialTheme.typography.body1)
+//                                Row {
+//                                    Text(
+//                                        text = "${question.tags.joinToString("  ")} ",
+//                                        style = MaterialTheme.typography.caption
+//                                    )
+//                                    Spacer(modifier = Modifier.width(2.dp))
+//                                    if (question.difficulty == "Easy")
+//                                        Text(
+//                                            text = "EASY",
+//                                            color = Color.Green,
+//                                            style = MaterialTheme.typography.caption ,
+//
+//                                        )
+//                                    if (question.difficulty == "Medium")
+//                                        Text(
+//                                            text = "MEDIUM",
+//                                            color = Color.Yellow,
+//                                            style = MaterialTheme.typography.caption
+//                                        )
+//                                    else
+//                                        Text(
+//                                            text = "HARD",
+//                                            color = Color.Red,
+//                                            style = MaterialTheme.typography.caption,
+//                                            fontWeight = FontWeight.Bold
+//                                        )
+//
+//                                }
+//
+//                            }
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 4.dp)
+                            .padding(vertical = 6.dp, horizontal = 8.dp)
                             .clickable {
-
-                                Toast.makeText(context, "Question clicked", Toast.LENGTH_SHORT)
-                                    .show()
-                                    //selectedQuestionNote = question
+                                Toast.makeText(context, "Question clicked", Toast.LENGTH_SHORT).show()
                                 selectedQuestion = question
-                                //takenote = true
-
-                                // Toggle status and update Firestore
-//                                val newStatus = !isDone
-//                                questionStatusMap = questionStatusMap.toMutableMap().apply {
-//                                    put(question.id, newStatus)
-//                                }
-//                                user?.let {
-//                                    firestore.collection("users")
-//                                        .document(user.uid)
-//                                        .update("questionsStatus.${question.id}", newStatus)
-//                                }
-//                                coroutineScope.launch {
-//                                    saveQuestionsStatus(context, questionStatusMap)
-//                                }
                             },
-                        elevation = 2.dp
+                        elevation = 4.dp,
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, Color.Black),
+
                     ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Column {
-                                Text(text = question.title, style = MaterialTheme.typography.body1)
-                                Row {
-                                    Text(
-                                        text = "${question.tags.joinToString("  ")} ",
-                                        style = MaterialTheme.typography.caption
-                                    )
-                                    Spacer(modifier = Modifier.width(2.dp))
-                                    if (question.difficulty == "Easy")
-                                        Text(
-                                            text = "EASY",
-                                            color = Color.Green,
-                                            style = MaterialTheme.typography.caption
-                                        )
-                                    if (question.difficulty == "Medium")
-                                        Text(
-                                            text = "MEDIUM",
-                                            color = Color.Yellow,
-                                            style = MaterialTheme.typography.caption
-                                        )
-                                    else
-                                        Text(
-                                            text = "HARD",
-                                            color = Color.Red,
-                                            style = MaterialTheme.typography.caption,
-                                            fontWeight = FontWeight.Bold
-                                        )
+                            Column(modifier = Modifier.weight(1f)) {
+                                // Question Title
+                                Text(
+                                    text = question.title,
+                                    style = MaterialTheme.typography.h6,
+                                    fontWeight = FontWeight.Bold
+                                )
 
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                // Tags and Difficulty
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+
+                                        // Tag Chips
+                                        question.tags.take(2).forEach { tag ->
+                                            val chipColor = Color(0xFF020202)
+
+
+
+                                            Box(
+                                                modifier = Modifier
+                                                    .background(
+                                                        chipColor,
+                                                        shape = RoundedCornerShape(16.dp)
+                                                    )
+                                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                                            ) {
+                                                Text(
+                                                    text = tag,
+                                                    style = MaterialTheme.typography.caption,
+                                                    color = Color.White,
+
+                                                    )
+                                            }
+                                        }
+
+
+
+//                                        // Difficulty Label
+//                                        val (diffColor, diffText) = when (question.difficulty) {
+//                                            "Easy" -> Color(0xFF4CAF50) to "EASY"
+//                                            "Medium" -> Color(0xFFFFA000) to "MEDIUM"
+//                                            else -> Color(0xFFD32F2F) to "HARD"
+//                                        }
+//
+//                                        Text(
+//                                            text = diffText,
+//                                            color = diffColor,
+//                                            fontWeight = FontWeight.Bold,
+//                                            style = MaterialTheme.typography.subtitle2,
+//                                            modifier = Modifier.padding(start = 8.dp)
+//                                        )
+                                    }
+                                }
+                            // Difficulty Label
+
+                                val (diffColor, diffText) = when (question.difficulty) {
+                                    "Easy" -> Color(0xFF4CAF50) to "EASY"
+                                    "Medium" -> Color(0xFFFFA000) to "MEDIUM"
+                                    else -> Color(0xFFD32F2F) to "HARD"
                                 }
 
-                            }
-//                            Icon(
-//                                painter = androidx.compose.ui.res.painterResource(
-//                                    id = if (isDone) R.drawable.done else R.drawable.not__done
-//                                ),
-//                                contentDescription = null,
-//                                modifier = Modifier.size(24.dp).clickable {
-//                                    val newStatus = !isDone
-//                                    questionStatusMap = questionStatusMap.toMutableMap().apply {
-//                                        put(question.id, newStatus)
-//                                    }
-//                                    user?.let {
-//                                        firestore.collection("users")
-//                                            .document(user.uid)
-//                                            .update("questionsStatus.${question.id}", newStatus)
-//                                    }
-//                                    coroutineScope.launch {
-//                                        saveQuestionsStatus(context, questionStatusMap)
-//                                    }
-//                                }
-//                            )
+
+                                Text(
+                                    text = diffText,
+                                    color = diffColor,
+                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.subtitle2,
+                                    modifier = Modifier.padding(start = 8.dp)
+                                )
+                            Spacer(modifier = Modifier.width(8.dp))
+
+//
                             Icon(
                                 painter = androidx.compose.ui.res.painterResource(
                                     id = if (isDone) R.drawable.done else R.drawable.not__done
@@ -589,7 +656,11 @@ fun HomeScreen(navController: NavController, user: FirebaseUser?) {
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "LeetCode #${selectedQuestion!!.leetcodeNumber ?: "Not Available"}",
-                            style = MaterialTheme.typography.body1.copy(color = Color.Gray)
+                            style = MaterialTheme.typography.body1.copy(color = Color.Gray),
+                            modifier = Modifier.clickable {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://leetcode.com/problems/find-words-containing-character/description/?envType=daily-question&envId=2025-05-24"))
+                                context.startActivity(intent)
+                            }
                         )
                     }
                 },

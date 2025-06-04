@@ -96,10 +96,12 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.0.0")
     implementation("com.google.code.gson:gson:2.10.1")
 
+
     implementation ("com.github.PhilJay:MPAndroidChart:v3.1.0")
 
+
     //font google
-    implementation("androidx.compose.ui:ui-text-google-fonts:1.6.0")
+    //implementation("androidx.compose.ui:ui-text-google-fonts:1.6.0")
 
 
 
