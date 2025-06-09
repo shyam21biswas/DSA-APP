@@ -87,6 +87,7 @@ fun AddQuestionScreen() {
     var difficulty by remember { mutableStateOf("") }
     var tags by remember { mutableStateOf("") }
     var message by remember { mutableStateOf("") }
+    var leetnum by remember {  mutableStateOf("")}
 
     LaunchedEffect(Unit) {
         db.collection("companies").get().addOnSuccessListener { result ->
@@ -106,17 +107,22 @@ fun AddQuestionScreen() {
         Spacer(modifier = Modifier.height(8.dp))
         OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Title") })
         Spacer(modifier = Modifier.height(8.dp))
-        OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("Description") })
-        Spacer(modifier = Modifier.height(8.dp))
+       // OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("Description") })
+        //Spacer(modifier = Modifier.height(8.dp))
         OutlinedTextField(value = link, onValueChange = { link = it }, label = { Text("Link") })
         Spacer(modifier = Modifier.height(8.dp))
         OutlinedTextField(value = difficulty, onValueChange = { difficulty = it }, label = { Text("Difficulty") })
         Spacer(modifier = Modifier.height(8.dp))
         OutlinedTextField(value = tags, onValueChange = { tags = it }, label = { Text("Tags (comma separated)") })
         Spacer(modifier = Modifier.height(8.dp))
+        OutlinedTextField(value = leetnum , onValueChange = { leetnum = it} , label = { Text("leetnum") } )
+        Spacer(modifier = Modifier.height(8.dp))
+
+
         Button(onClick = {
             if (selectedCompany.isNotBlank() && title.isNotBlank()) {
                 val questionData = hashMapOf(
+                    "leetnumber" to leetnum,
                     "title" to title,
                     "description" to description,
                     "link" to link,

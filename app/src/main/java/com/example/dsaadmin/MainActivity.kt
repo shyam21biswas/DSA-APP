@@ -36,16 +36,20 @@ class MainActivity : ComponentActivity() {
         setContent {
             DSAAdminTheme {
                 //AdminHomeScreen()
+                //AddQuestionFromCSVScreen()
+                //CongratulationsDialog(true) { }
+                //MilestoneDialog(true ){}
 
-                MyApp()
-//                val navController = rememberNavController()
-//                NavHost(navController = navController, startDestination = "ved") {
-//                    composable("ved") { ved(navController) }
-//                    composable("myapp") { MyApp() }
-//                    composable("admin") { AdminHomeScreen() }
-//
-//                }
-               // BarChartScreen()
+                //MyApp()
+                val navController = rememberNavController()
+                NavHost(navController = navController, startDestination = "ved") {
+                    composable("ved") { ved(navController) }
+                    composable("myapp") { MyApp() }
+                    composable("admin") { AdminHomeScreen() }
+                    composable("csv"){ AddQuestionFromCSVScreen() }
+
+                }
+//               // BarChartScreen()
 
 
             }
@@ -65,7 +69,7 @@ fun MyApp() {
 
 
     NavHost(navController = navController, startDestination = if (user != null) "home" else "signin") {
-        composable("signin") { SignInScreen(navController) }
+        composable("signin") { SignInScreenf(navController) }
         composable("home") { HomeScreen(navController, FirebaseAuth.getInstance().currentUser) }
     }
 }
@@ -81,7 +85,7 @@ fun ved (navController: NavHostController)
         Button(
                 onClick = {
                     navController.navigate("myapp")
-                    {popUpTo("ved") { inclusive = true }}
+                    //{popUpTo("ved") { inclusive = true }}
 
                 },
             colors = ButtonDefaults.buttonColors( Color.Green),
@@ -94,13 +98,26 @@ fun ved (navController: NavHostController)
         Button(
             onClick = {
                 navController.navigate("admin")
-                {popUpTo("ved") { inclusive = true }}
+                //{popUpTo("ved") { inclusive = true }}
 
             },
             colors = ButtonDefaults.buttonColors( Color.Green),
             modifier = Modifier.padding(16.dp)
         ) {
             Text("admin" , color = Color.White )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+        Button(
+            onClick = {
+                navController.navigate("csv")
+                //{popUpTo("ved") { inclusive = true }}
+
+            },
+            colors = ButtonDefaults.buttonColors( Color.Green),
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Text("csv" , color = Color.White )
         }
 
 

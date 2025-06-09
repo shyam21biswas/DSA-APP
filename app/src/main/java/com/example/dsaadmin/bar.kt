@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.view.ViewGroup
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -30,6 +31,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.rememberAsyncImagePainter
+import com.github.mikephil.charting.charts.LineChart
 
 
 @Composable
@@ -57,6 +60,7 @@ fun BarChartScreen(userId: String, onDismiss: () -> Unit ) {
 
     ) {
         Row {
+
             Text("📊 Daily Solved Questions", style = MaterialTheme.typography.h6)
            // Text("X", style = MaterialTheme.typography.h6, modifier = Modifier.weight(1f).clickable {  onDismiss  }, textAlign = TextAlign.End)
             Spacer(modifier = Modifier.weight(1f))
@@ -66,6 +70,7 @@ fun BarChartScreen(userId: String, onDismiss: () -> Unit ) {
         }
         //Spacer(modifier = Modifier.height(16.dp))
         BarChartView(stats , userId)
+
     }
 }
 
@@ -94,7 +99,7 @@ fun BarChartView(stats: Map<String, Int> , userId: String) {
                     valueTextSize = 12f
                 }
 
-                chart.data = BarData(dataSet)
+                chart.data  = BarData(dataSet)
 
                 chart.xAxis.apply {
                     valueFormatter = IndexAxisValueFormatter(stats.keys.toList())
@@ -124,6 +129,8 @@ fun BarChartView(stats: Map<String, Int> , userId: String) {
         }
 
         Column(modifier = Modifier.padding(16.dp).fillMaxWidth().heightIn(min = 200.dp, max = 270.dp)){ // Limit max height) {
+
+
             Text("Recent Solved Questions", style = MaterialTheme.typography.h6)
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -168,5 +175,6 @@ fun BarChartView(stats: Map<String, Int> , userId: String) {
 
 
     }
-
 }
+
+

@@ -103,6 +103,9 @@ dependencies {
     //font google
     //implementation("androidx.compose.ui:ui-text-google-fonts:1.6.0")
 
+    implementation ("com.airbnb.android:lottie-compose:6.1.0")
+
+
 
 
 

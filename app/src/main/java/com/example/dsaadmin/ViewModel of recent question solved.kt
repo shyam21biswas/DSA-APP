@@ -30,6 +30,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+
+
 data class SolvedQuestion(
     val title: String = "",
     val timestamp: String = ""
@@ -42,43 +44,99 @@ class RecentSolvedViewModel : ViewModel() {
 
     fun loadRecentSolved(userId: String) {
         val db = FirebaseFirestore.getInstance()
-        db.collection("users").document(userId).collection("recentSolved")
-            .orderBy("timestamp", Query.Direction.DESCENDING)
-            .limit(5)
-            .get()
-            .addOnSuccessListener { snapshot ->
-                val list = snapshot.documents.mapNotNull { doc ->
-                    val title = doc.getString("title")
-                    val timestamp = doc.getString("timestamp")
-                    if (title != null && timestamp != null) {
+        val docRef = db.collection("users").document(userId).collection("recentSolved").document("last5")
+
+        docRef.get().addOnSuccessListener { document ->
+            if (document.exists()) {
+                val array = document["questions"] as? List<Map<String, String>> ?: emptyList()
+                val list = array.mapNotNull {
+                    val title = it["title"]
+                    val timestamp = it["timestamp"]
+                    if (title != null && timestamp != null)
                         SolvedQuestion(title, timestamp)
-                    } else null
-                }
+                    else null
+                }.reversed() // show latest first
                 _recentSolved.value = list
             }
+        }
     }
 
     fun addSolvedQuestion(userId: String, title: String) {
-        val timestamp = SimpleDateFormat("hh:mm a, dd MMM yyyy",  Locale.getDefault()).format(Date())
-        val question = SolvedQuestion(title, timestamp)
+        val timestamp = SimpleDateFormat("hh:mm a, dd MMM yyyy", Locale.getDefault()).format(Date())
+        val newQuestion = mapOf("title" to title, "timestamp" to timestamp)
 
-        val ref = FirebaseFirestore.getInstance()
+        val docRef = FirebaseFirestore.getInstance()
             .collection("users").document(userId)
-            .collection("recentSolved")
+            .collection("recentSolved").document("last5")
 
-        // Add new question
-        ref.add(question)
-            .addOnSuccessListener {
-                // Reload and trim to 5
-                loadRecentSolved(userId)
-                // Trim logic — ensure only last 5 remain
-                ref.orderBy("timestamp", Query.Direction.DESCENDING).get().addOnSuccessListener { snapshot ->
-                    val extra = snapshot.documents.drop(5)
-                    extra.forEach { it.reference.delete() }
-                }
+        docRef.get().addOnSuccessListener { document ->
+            val currentList = (document["questions"] as? List<Map<String, String>>)?.toMutableList() ?: mutableListOf()
+
+            currentList.add(newQuestion)
+            if (currentList.size > 5) {
+                currentList.removeAt(0) // remove oldest
             }
+
+            docRef.set(mapOf("questions" to currentList))
+                .addOnSuccessListener {
+                    _recentSolved.value = currentList.reversed().map {
+                        SolvedQuestion(it["title"] ?: "", it["timestamp"] ?: "")
+                    }
+                }
+        }
     }
 }
+
+
+//data class SolvedQuestion(
+//    val title: String = "",
+//    val timestamp: String = ""
+//)
+//
+//class RecentSolvedViewModel : ViewModel() {
+//
+//    private val _recentSolved = MutableStateFlow<List<SolvedQuestion>>(emptyList())
+//    val recentSolved: StateFlow<List<SolvedQuestion>> = _recentSolved.asStateFlow()
+//
+//    fun loadRecentSolved(userId: String) {
+//        val db = FirebaseFirestore.getInstance()
+//        db.collection("users").document(userId).collection("recentSolved")
+//            .orderBy("timestamp", Query.Direction.DESCENDING)
+//            .limit(5)
+//            .get()
+//            .addOnSuccessListener { snapshot ->
+//                val list = snapshot.documents.mapNotNull { doc ->
+//                    val title = doc.getString("title")
+//                    val timestamp = doc.getString("timestamp")
+//                    if (title != null && timestamp != null) {
+//                        SolvedQuestion(title, timestamp)
+//                    } else null
+//                }
+//                _recentSolved.value = list
+//            }
+//    }
+//
+//    fun addSolvedQuestion(userId: String, title: String) {
+//        val timestamp = SimpleDateFormat("hh:mm a, dd MMM yyyy",  Locale.getDefault()).format(Date())
+//        val question = SolvedQuestion(title, timestamp)
+//
+//        val ref = FirebaseFirestore.getInstance()
+//            .collection("users").document(userId)
+//            .collection("recentSolved")
+//
+//        // Add new question
+//        ref.add(question)
+//            .addOnSuccessListener {
+//                // Reload and trim to 5
+//                loadRecentSolved(userId)
+//                // Trim logic — ensure only last 5 remain
+//                ref.orderBy("timestamp", Query.Direction.DESCENDING).get().addOnSuccessListener { snapshot ->
+//                    val extra = snapshot.documents.drop(5)
+//                    extra.forEach { it.reference.delete() }
+//                }
+//            }
+//    }
+//}
 
 
 @Composable

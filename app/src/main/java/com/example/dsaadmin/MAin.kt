@@ -2,9 +2,11 @@ package com.example.dsaadmin
 
 import android.content.Intent
 import android.net.Uri
+import android.provider.Settings
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExperimentalAnimationApi
@@ -19,6 +21,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.with
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -52,28 +55,42 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 import androidx.compose.foundation.layout.FlowRow
+
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.google.android.gms.auth.api.identity.BeginSignInRequest
+import com.google.android.gms.auth.api.identity.Identity
+import com.google.android.gms.auth.api.identity.SignInCredential
+import com.google.android.gms.tasks.Task
+import com.google.firebase.auth.AuthResult
+import com.google.firebase.auth.ktx.auth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.Query
+import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+
+import androidx.compose.material3.Button
 
 
 data class Company(
@@ -87,8 +104,8 @@ data class Company(
 data class Question(
     val id: String,
     val title: String,
-    //val status: String,
-    val leetcodeNumber: Int? = null,
+    val link: String? = "",
+    val leetnumber: String? = "Ve",
     val tags: List<String> = emptyList(),
     val difficulty: String
 )
@@ -176,6 +193,7 @@ fun HomeScreen(navController: NavController, user: FirebaseUser?) {
                 val questionsSnapshot = firestore.collection("companies")
                     .document(companyDoc.id)
                     .collection("questions")
+                    //.orderBy("uploadedAt", Query.Direction.DESCENDING) // ✅ fetch oldest first
                     .get()
                     .await()
 
@@ -216,6 +234,7 @@ fun HomeScreen(navController: NavController, user: FirebaseUser?) {
         val snapshot = firestore.collection("companies")
             .document(selectedCompanyId!!)
             .collection("questions")
+            //.orderBy("leetnumber",Query.Direction.ASCENDING)
             .get()
             .await()
 
@@ -223,6 +242,8 @@ fun HomeScreen(navController: NavController, user: FirebaseUser?) {
             Question(
                 id = doc.id,
                 title = doc.getString("title") ?: "Untitled",
+                link = doc.getString("link"),
+                leetnumber = doc.getString("leetnumber"),
                 //status = if (questionStatusMap[doc.id] == true) "Done" else "To Do",
 
                 tags = doc.get("tags") as? List<String> ?: emptyList(),
@@ -383,59 +404,7 @@ fun HomeScreen(navController: NavController, user: FirebaseUser?) {
                 items(questions) { question ->
                     val isDone = questionStatusMap[question.id] == true
 
-//                    Card(
-//                        modifier = Modifier
-//                            .fillMaxWidth()
-//                            .padding(vertical = 4.dp)
-//                            .clickable {
-//
-//                                Toast.makeText(context, "Question clicked", Toast.LENGTH_SHORT)
-//                                    .show()
-//
-//                                selectedQuestion = question
-//
-//                            },
-//                        elevation = 2.dp
-//                    ) {
-//                        Row(
-//                            modifier = Modifier
-//                                .fillMaxWidth()
-//                                .padding(16.dp),
-//                            horizontalArrangement = Arrangement.SpaceBetween,
-//                            verticalAlignment = Alignment.CenterVertically
-//                        ) {
-//                            Column {
-//                                Text(text = question.title, style = MaterialTheme.typography.body1)
-//                                Row {
-//                                    Text(
-//                                        text = "${question.tags.joinToString("  ")} ",
-//                                        style = MaterialTheme.typography.caption
-//                                    )
-//                                    Spacer(modifier = Modifier.width(2.dp))
-//                                    if (question.difficulty == "Easy")
-//                                        Text(
-//                                            text = "EASY",
-//                                            color = Color.Green,
-//                                            style = MaterialTheme.typography.caption ,
-//
-//                                        )
-//                                    if (question.difficulty == "Medium")
-//                                        Text(
-//                                            text = "MEDIUM",
-//                                            color = Color.Yellow,
-//                                            style = MaterialTheme.typography.caption
-//                                        )
-//                                    else
-//                                        Text(
-//                                            text = "HARD",
-//                                            color = Color.Red,
-//                                            style = MaterialTheme.typography.caption,
-//                                            fontWeight = FontWeight.Bold
-//                                        )
-//
-//                                }
-//
-//                            }
+
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -461,13 +430,16 @@ fun HomeScreen(navController: NavController, user: FirebaseUser?) {
                                 Text(
                                     text = question.title,
                                     style = MaterialTheme.typography.h6,
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.fillMaxWidth()
                                 )
 
                                 Spacer(modifier = Modifier.height(8.dp))
 
                                 // Tags and Difficulty
-                                Row(
+                               /* Row(
                                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
@@ -511,7 +483,7 @@ fun HomeScreen(navController: NavController, user: FirebaseUser?) {
 //                                            style = MaterialTheme.typography.subtitle2,
 //                                            modifier = Modifier.padding(start = 8.dp)
 //                                        )
-                                    }
+                                    }*/
                                 }
                             // Difficulty Label
 
@@ -570,51 +542,8 @@ fun HomeScreen(navController: NavController, user: FirebaseUser?) {
         }
     }
 
-    /*val colorlist = listOf(
-        Color(0xFF4CAF50),
-        Color(0xFFE91E63),
-        Color(0xFFE0A952)
-    )
-    if (selectedQuestion != null) {
-        AlertDialog(
-            shape = RoundedCornerShape(16.dp),
 
-            onDismissRequest = { selectedQuestion = null },
-            title = {
-                Text(text = selectedQuestion!!.title, fontWeight = FontWeight.Bold)
-            },
-            text = {
-                FlowRow(
-
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(2.dp)
-                ) {
-                    selectedQuestion!!.tags.forEach { tag ->
-                        Surface(
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier.padding(horizontal = 8.dp),
-                            elevation = 4.dp,
-                            color = Color(colorlist.random().value)
-                        ) {
-                            Text(
-                                text = tag,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
-                                style = MaterialTheme.typography.body2
-                            )
-
-                        }
-                    }
-                }
-            },
-
-            confirmButton = {
-                TextButton(onClick = { selectedQuestion = null }) {
-                    Text("Close")
-                }
-            }
-        )
-    }*/
+    //main decription diaglog..............................................
     val colorList = listOf(
         Color(0xFF4CAF50),
         Color(0xFFE91E63),
@@ -649,19 +578,26 @@ fun HomeScreen(navController: NavController, user: FirebaseUser?) {
                 onDismissRequest = { selectedQuestion = null },
                 title = {
                     Column(modifier = Modifier.fillMaxWidth()) {
+
+
                         Text(
-                            text = selectedQuestion!!.title,
-                            style = MaterialTheme.typography.h5.copy(fontWeight = FontWeight.Bold)
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "LeetCode #${selectedQuestion!!.leetcodeNumber ?: "Not Available"}",
+                            text = "LeetCode #${selectedQuestion!!.leetnumber ?: "Not Available"}",
                             style = MaterialTheme.typography.body1.copy(color = Color.Gray),
                             modifier = Modifier.clickable {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://leetcode.com/problems/find-words-containing-character/description/?envType=daily-question&envId=2025-05-24"))
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(selectedQuestion!!.link))
                                 context.startActivity(intent)
                             }
                         )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = selectedQuestion!!.title,
+                            style = MaterialTheme.typography.h6 .copy(fontWeight = FontWeight.Bold)
+                            ,modifier = Modifier.clickable {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(selectedQuestion!!.link))
+                                context.startActivity(intent)
+                            }
+                        )
+
                     }
                 },
                 text = {
@@ -725,23 +661,82 @@ fun HomeScreen(navController: NavController, user: FirebaseUser?) {
     }
 
     //when all question are solved ......
+//    if (hasShownDialog) {
+//        AlertDialog(
+//            shape = RoundedCornerShape(16.dp),
+//            onDismissRequest = { hasShownDialog = false },
+//            title = {
+//                Text("🎉 Congratulations!", fontWeight = FontWeight.Bold)
+//            },
+//            text = {
+//                Text("You’ve completed all questions from the Company Tag!\nTime to dominate those interviews. 💼🔥")
+//            },
+//            confirmButton = {
+//                TextButton(onClick = { hasShownDialog = false }) {
+//                    Text("Awesome! 🚀")
+//                }
+//            }
+//        )
+//    }
+
     if (hasShownDialog) {
         AlertDialog(
-            shape = RoundedCornerShape(16.dp),
             onDismissRequest = { hasShownDialog = false },
-            title = {
-                Text("🎉 Congratulations!", fontWeight = FontWeight.Bold)
-            },
-            text = {
-                Text("You’ve completed all questions from the Company Tag!\nTime to dominate those interviews. 💼🔥")
-            },
             confirmButton = {
                 TextButton(onClick = { hasShownDialog = false }) {
-                    Text("Awesome! 🚀")
+                    Text("Awesome! 🚀" , color = Color.Black ,)
                 }
-            }
+            },
+            //backgroundColor = Color(0xFFFEAE3F), // Match with image background 0xFFFFB74D
+            backgroundColor = Color(0xFFABC9AA), // Match with image background 0xFFFFB74D
+
+
+            title = {
+                // Top Image Box
+                Box(
+                    //modifier = Modifier.fillMaxWidth()
+                    //.height(200.dp)
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.man4),
+                        contentDescription = "Milestone",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.height(150.dp).width(350.dp)
+                    )
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(0.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Top Image Bo
+
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = "🎉 Congratulations!",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp,
+                        textAlign = TextAlign.Center,
+                        color = Color.Black
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "You’ve completed all questions from the Company Tag!\nTime to dominate those interviews. 💼🔥",
+                        textAlign = TextAlign.Center,
+                        color = Color.Black
+                    )
+                }
+            },
+            shape = RoundedCornerShape(16.dp)
         )
     }
+
+
 
     //question click
     //2. add a function that will show you the  last 5 question solved............
@@ -818,76 +813,151 @@ fun HomeScreen(navController: NavController, user: FirebaseUser?) {
             }
         )
     }
-    }
+
+
+}
 
 
 
-
-//google signing up and intial firestore............
 @Composable
-fun SignInScreen(navController: NavController) {
-        val context = LocalContext.current
+fun SignInScreenf(navController: NavController) {
+    val context = LocalContext.current
+    val auth = FirebaseAuth.getInstance()
+    val oneTapClient = Identity.getSignInClient(context)
+    var userName by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+    var navigateToHome by remember { mutableStateOf(false) }
 
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        try {
+            val credential = oneTapClient.getSignInCredentialFromIntent(result.data)
+            val idToken = credential.googleIdToken
 
-        val launcher = rememberLauncherForActivityResult(
-            contract = ActivityResultContracts.StartActivityForResult()
-        ) { result ->
-            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
-            try {
-                val account = task.getResult(ApiException::class.java)
-                val credential = GoogleAuthProvider.getCredential(account.idToken, null)
-                FirebaseAuth.getInstance().signInWithCredential(credential)
-                    .addOnCompleteListener { authResult ->
-                        if (authResult.isSuccessful) {
-                            val user = FirebaseAuth.getInstance().currentUser
-                            user?.let {
-                                val firestore = FirebaseFirestore.getInstance()
-                                val userRef = firestore.collection("users").document(user.uid)
+            if (idToken != null) {
+                val firebaseCredential = GoogleAuthProvider.getCredential(idToken, null)
+                auth.signInWithCredential(firebaseCredential)
+                    .addOnCompleteListener { task ->
+                        if (task.isSuccessful) {
+                            val user = auth.currentUser
+                            userName = user?.displayName
 
-                                userRef.get().addOnSuccessListener { document ->
-                                    if (!document.exists()) {
-                                        // Create user document with default data
-                                        val userData =
-                                            mapOf("questionsStatus" to mapOf<String, Boolean>())
-                                        userRef.set(userData)
-                                            .addOnSuccessListener {
-                                                Log.d("Firestore", "User document created")
-                                            }
-                                            .addOnFailureListener { e ->
-                                                Log.e(
-                                                    "Firestore",
-                                                    "Failed to create user document",
-                                                    e
-                                                )
-                                            }
-                                    }
+                            val firestore = FirebaseFirestore.getInstance()
+                            val userRef = firestore.collection("users").document(user!!.uid)
+
+                            userRef.get().addOnSuccessListener { document ->
+                                if (!document.exists()) {
+                                    val userData = mapOf("questionsStatus" to mapOf<String, Boolean>())
+                                    userRef.set(userData)
+                                        .addOnSuccessListener {
+                                            Log.d("Firestore", "User document created")
+                                        }
+                                        .addOnFailureListener {
+                                            Log.e("Firestore", "Failed to create user document", it)
+                                        }
                                 }
                             }
-                            navController.navigate("home")
+
+                            Toast.makeText(context, "Login successful!", Toast.LENGTH_SHORT).show()
+
+
+
                         } else {
                             Toast.makeText(context, "Sign-in failed", Toast.LENGTH_SHORT).show()
                         }
                     }
-            } catch (e: Exception) {
-                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
             }
-        }
-
-        LaunchedEffect(Unit) {
-            val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                .requestIdToken("958727059701-ccqo9qce5aro0tc9hllhci7h7cgq8tfo.apps.googleusercontent.com") // Add this from google-services.json
-                .requestEmail()
-                .build()
-
-            val client = GoogleSignIn.getClient(context, gso)
-            val signInIntent = client.signInIntent
-            launcher.launch(signInIntent)
-        }
-
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
+        } catch (e: Exception) {
+            Toast.makeText(context, "Error: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
         }
     }
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = Color.Black
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            if (userName == null) {
+                Text(
+                    text = "Welcome!",
+                    style = MaterialTheme.typography.h5,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF4F76BB)
+                )
+
+                Spacer(modifier = Modifier.height(40.dp))
+
+                Button(
+                    onClick = {
+                        val signInRequest = BeginSignInRequest.builder()
+                            .setGoogleIdTokenRequestOptions(
+                                BeginSignInRequest.GoogleIdTokenRequestOptions.builder()
+                                    .setSupported(true)
+                                    .setServerClientId("958727059701-ccqo9qce5aro0tc9hllhci7h7cgq8tfo.apps.googleusercontent.com")
+                                    .setFilterByAuthorizedAccounts(false)
+                                    .build()
+                            )
+                            .build()
+
+                        oneTapClient.beginSignIn(signInRequest)
+                            .addOnSuccessListener { result ->
+                                val intentSenderRequest = IntentSenderRequest.Builder(result.pendingIntent).build()
+                                launcher.launch(intentSenderRequest)
+                            }
+                            .addOnFailureListener {
+                                Toast.makeText(context, "Google Sign-In failed", Toast.LENGTH_SHORT).show()
+                            }
+                    },
+                    shape = RoundedCornerShape(50),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF4285F4),
+                        contentColor = Color.White
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                ) {
+                    Text(text = "Sign in with Google", fontSize = 18.sp)
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    "Sign in with email",
+                    modifier = Modifier.clickable { navController.navigate("manualEmail") },
+                    color = Color(0xFF4F76BB)
+                )
+            } else {
+                Text(
+                    text = "Welcome, $userName!!",
+                    style = MaterialTheme.typography.h4,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF145ACB)
+                )
+                navigateToHome = true
+
+            }
+        }
+    }
+
+    if (navigateToHome) {
+        LaunchedEffect(Unit) {
+            delay(2000)
+            navController.navigate("home")
+            {popUpTo("signin") { inclusive = true }}
+
+            navigateToHome = false
+        }
+    }
+
+}
 
 
 
@@ -1103,6 +1173,7 @@ fun BarChart(stats: Map<String, Int>, modifier: Modifier = Modifier) {
     }
 
 
+//store number of question solved
 fun incrementTodaySolved(userId: String) {
     val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
     val docRef = FirebaseFirestore.getInstance()
@@ -1183,4 +1254,106 @@ fun StatsDialog(userId: String, onDismiss: () -> Unit) {
 
 
 
+
+@Composable
+fun CongratulationsDialog(hasShownDialog: Boolean, onDismiss: () -> Unit) {
+    if (hasShownDialog) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            confirmButton = {
+                TextButton(onClick = onDismiss) {
+                    Text("Awesome! 🚀")
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Replace with your image
+                    Image(
+                        painter = painterResource(id = R.drawable.winner2),
+                        contentDescription = "Trophy",
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(bottom = 16.dp)
+                    )
+                    Text(
+                        text = "🎉 Congratulations!",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "You’ve completed all questions from the Company Tag!\nTime to dominate those interviews. 💼🔥",
+                        textAlign = TextAlign.Center
+                    )
+                }
+            },
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
+}
+
+@Composable
+fun MilestoneDialog(
+    showDialog: Boolean,
+    onDismiss: () -> Unit
+) {
+    if (showDialog) {
+        AlertDialog(
+            onDismissRequest = {  },
+            confirmButton = {
+                TextButton(onClick = { }) {
+                    Text("Awesome!🚀" , fontSize = 20.sp , color = Color.Black , fontWeight = FontWeight.Bold ,)
+                }
+            },
+            backgroundColor = Color(0xFFABC9AA), // Match with image background 0xFFFFB74D
+
+             title = {
+                // Top Image Box
+                Box(
+                    //modifier = Modifier.fillMaxWidth()
+                        //.height(200.dp)
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.man4),
+                        contentDescription = "Milestone",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.height(125.dp).width(350.dp)
+                    )
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(0.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Top Image Bo
+
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = "🎉 Congratulations!",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp,
+                        textAlign = TextAlign.Center,
+                        color = Color.Black
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "You’ve completed all questions from the Company Tag!\nTime to dominate those interviews. 💼🔥",
+                        textAlign = TextAlign.Center,
+                        color = Color.Black
+                    )
+                }
+            },
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
+}
 
